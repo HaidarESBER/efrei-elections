@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+  <title>Candidater — Élection du délégué EFREI</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="index.html" style="text-decoration:none;">
+        <span>EFREI</span><span class="brand-mark">.</span>
+        <span class="brand-sub">Élections</span>
+      </a>
+    </div>
+  </header>
+
+  <main>
+    <a class="steps-back" href="index.html">← Retour</a>
+
+    <div class="card">
+      <h2>Je souhaite candidater</h2>
+      <p class="card-desc">
+        Renseignez votre e-mail EFREI et votre nom. Si votre adresse figure
+        sur la liste de la classe, vous serez ajouté(e) à la liste des
+        candidats visibles lors du vote.
+      </p>
+
+      <div id="msg" class="msg" hidden></div>
+
+      <form id="candidate-form">
+        <div class="field">
+          <label for="name">Prénom et nom</label>
+          <input type="text" id="name" required autocomplete="name" placeholder="Jean Dupont" />
+        </div>
+
+        <div class="field">
+          <label for="email">Adresse e-mail EFREI</label>
+          <input type="email" id="email" required autocomplete="email" placeholder="prenom.nom@efrei.net" />
+          <p class="hint">Doit correspondre à l'adresse inscrite sur la liste de la classe.</p>
+        </div>
+
+        <button type="submit" class="btn accent" id="submit-btn" data-label="Confirmer ma candidature">
+          Confirmer ma candidature
+        </button>
+      </form>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    Élection du délégué de classe · EFREI
+  </footer>
+
+  <script src="config.js"></script>
+  <script src="script.js"></script>
+  <script>
+    const form = document.getElementById("candidate-form");
+    const msgEl = document.getElementById("msg");
+    const submitBtn = document.getElementById("submit-btn");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      hideMsg(msgEl);
+
+      const name = document.getElementById("name").value.trim();
+      const email = normalizeEmail(document.getElementById("email").value);
+
+      if (!name) {
+        showMsg(msgEl, "Merci de renseigner votre nom.", "error");
+        return;
+      }
+      if (!isEfreiEmail(email)) {
+        showMsg(msgEl, "Adresse e-mail invalide.", "error");
+        return;
+      }
+
+      setLoading(submitBtn, true, "Vérification...");
+      try {
+        const voters = await loadVoters();
+        if (!voters.has(email)) {
+          showMsg(
+            msgEl,
+            "Cette adresse e-mail n'est pas inscrite sur la liste de la classe. Vous ne pouvez pas candidater.",
+            "error"
+          );
+          return;
+        }
+
+        await callBackend("candidate", { name, email });
+        showMsg(
+          msgEl,
+          "Votre candidature a bien été enregistrée. Vous apparaîtrez dans la liste des candidats lors du vote.",
+          "success"
+        );
+        form.reset();
+      } catch (err) {
+        showMsg(msgEl, err.message, "error");
+      } finally {
+        setLoading(submitBtn, false);
+      }
+    });
+  </script>
+</body>
+</html>

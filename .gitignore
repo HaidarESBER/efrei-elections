@@ -1,0 +1,9 @@
+# Real class roster (names + EFREI emails). Never push this — the live
+# voter list lives only in the deployed Google Apps Script (VOTERS array),
+# never in git. This file is kept locally purely as your own reference
+# for updating that script later.
+voters.json
+
+# OS junk
+.DS_Store
+Thumbs.db
