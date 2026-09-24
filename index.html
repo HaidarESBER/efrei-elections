@@ -55,7 +55,7 @@
       </button>
 
       <div class="candidater-cta">
-        <a class="btn-link-small" href="candidater.html">Je souhaite candidater</a>
+        <a class="btn-link-small" id="candidater-link" href="candidater.html">Je souhaite candidater</a>
       </div>
     </div>
 
@@ -85,6 +85,7 @@
     const candidateListEl = document.getElementById("candidate-list");
     const selectedCountEl = document.getElementById("selected-count");
     const voteBtn = document.getElementById("vote-btn");
+    const candidaterLink = document.getElementById("candidater-link");
 
     let currentEmail = "";
     let selected = [];
@@ -137,6 +138,7 @@
         }
 
         currentEmail = email;
+        candidaterLink.href = `candidater.html?email=${encodeURIComponent(email)}`;
         stepEmail.hidden = true;
         stepBallot.hidden = false;
       } catch (err) {

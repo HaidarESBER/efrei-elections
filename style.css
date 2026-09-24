@@ -230,6 +230,11 @@ textarea:focus {
   background: #fff;
 }
 
+input[readonly] {
+  background: #eef1fb;
+  color: var(--text-muted);
+}
+
 .field {
   margin-bottom: 18px;
 }
