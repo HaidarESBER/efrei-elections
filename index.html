@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
   <title>Élection du délégué — EFREI</title>
-  <meta name="description" content="Votez ou candidatez pour l'élection du délégué de classe EFREI." />
+  <meta name="description" content="Votez pour l'élection du délégué de classe EFREI." />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -18,41 +18,173 @@
   </header>
 
   <main>
-    <section class="hero">
-      <h1>Élection du délégué de classe</h1>
-      <p>
-        Candidatez pour représenter votre classe ou votez pour les deux
-        personnes qui vous semblent les plus légitimes. Seuls les étudiants
-        inscrits sur la liste de la classe peuvent participer.
+    <!-- Step 1: email -->
+    <div class="card" id="step-email">
+      <h2>Vérification</h2>
+      <p class="card-desc">
+        Entrez votre e-mail EFREI pour accéder au bulletin de vote. Seuls
+        les étudiants inscrits sur la liste de la classe peuvent voter.
       </p>
-    </section>
 
-    <div class="action-grid">
-      <a class="action-card primary" href="voter.html">
-        <span class="icon">🗳️</span>
-        <h3>Voter</h3>
-        <p>Choisissez jusqu'à 2 candidats. Un seul vote autorisé par personne.</p>
-      </a>
+      <div id="msg-email" class="msg" hidden></div>
 
-      <a class="action-card" href="candidater.html">
-        <span class="icon">🙋</span>
-        <h3>Je souhaite candidater</h3>
-        <p>Inscrivez-vous comme candidat pour apparaître dans la liste de vote.</p>
-      </a>
+      <form id="email-form">
+        <div class="field">
+          <label for="voter-email">Adresse e-mail EFREI</label>
+          <input type="email" id="voter-email" required autocomplete="email" placeholder="prenom.nom@efrei.net" />
+        </div>
+        <button type="submit" class="btn" id="check-btn" data-label="Continuer">Continuer</button>
+      </form>
     </div>
 
-    <div class="card" style="margin-top: 28px;">
-      <h2>Comment ça marche ?</h2>
-      <p class="card-desc" style="margin-bottom:0;">
-        1. Les candidats s'inscrivent via le bouton « Je souhaite candidater ».<br />
-        2. Le jour du vote, chaque étudiant de la classe vote pour 2 personnes maximum.<br />
-        3. Seules les adresses e-mail présentes dans la liste de la classe sont autorisées à voter ou candidater.
-      </p>
+    <!-- Step 2: ballot -->
+    <div class="card" id="step-ballot" hidden>
+      <h2>Votre bulletin</h2>
+      <p class="card-desc">Sélectionnez jusqu'à 2 candidats.</p>
+
+      <div id="msg-ballot" class="msg" hidden></div>
+
+      <div class="counter">
+        <strong id="selected-count">0</strong> / 2 candidat(s) sélectionné(s)
+      </div>
+
+      <div id="candidate-list" class="candidate-list"></div>
+
+      <button type="button" class="btn accent" id="vote-btn" data-label="Valider mon vote" disabled>
+        Valider mon vote
+      </button>
+
+      <div class="candidater-cta">
+        <a class="btn-link-small" href="candidater.html">Je souhaite candidater</a>
+      </div>
+    </div>
+
+    <!-- Step 3: confirmation -->
+    <div class="card" id="step-done" hidden>
+      <h2>Merci !</h2>
+      <p class="card-desc" style="margin-bottom:0;">Votre vote a bien été enregistré.</p>
     </div>
   </main>
 
   <footer class="site-footer">
     Élection du délégué de classe · EFREI
   </footer>
+
+  <script src="config.js"></script>
+  <script src="script.js"></script>
+  <script>
+    const stepEmail = document.getElementById("step-email");
+    const stepBallot = document.getElementById("step-ballot");
+    const stepDone = document.getElementById("step-done");
+
+    const emailForm = document.getElementById("email-form");
+    const msgEmail = document.getElementById("msg-email");
+    const checkBtn = document.getElementById("check-btn");
+
+    const msgBallot = document.getElementById("msg-ballot");
+    const candidateListEl = document.getElementById("candidate-list");
+    const selectedCountEl = document.getElementById("selected-count");
+    const voteBtn = document.getElementById("vote-btn");
+
+    let currentEmail = "";
+    let selected = [];
+
+    emailForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      hideMsg(msgEmail);
+
+      const email = normalizeEmail(document.getElementById("voter-email").value);
+      if (!isEfreiEmail(email)) {
+        showMsg(msgEmail, "Adresse e-mail invalide.", "error");
+        return;
+      }
+
+      setLoading(checkBtn, true, "Vérification...");
+      try {
+        const voters = await loadVoters();
+        if (!voters.has(email)) {
+          showMsg(
+            msgEmail,
+            "Cette adresse e-mail n'est pas inscrite sur la liste de la classe. Vous ne pouvez pas voter.",
+            "error"
+          );
+          return;
+        }
+
+        const res = await callBackend("candidates", {}, "GET");
+        const candidates = res.candidates || [];
+
+        if (candidates.length === 0) {
+          candidateListEl.innerHTML =
+            '<div class="empty-state">Aucun candidat n\'est inscrit pour le moment.</div>';
+        } else {
+          candidateListEl.innerHTML = candidates
+            .map(
+              (c, i) => `
+              <label class="candidate-option" data-email="${c.email}" id="opt-${i}">
+                <input type="checkbox" value="${c.email}" data-name="${c.name}" />
+                <span>
+                  <span class="cname">${c.name}</span>
+                  <span class="cemail">${c.email}</span>
+                </span>
+              </label>`
+            )
+            .join("");
+
+          candidateListEl.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+            cb.addEventListener("change", onSelectionChange);
+          });
+        }
+
+        currentEmail = email;
+        stepEmail.hidden = true;
+        stepBallot.hidden = false;
+      } catch (err) {
+        showMsg(msgEmail, err.message, "error");
+      } finally {
+        setLoading(checkBtn, false);
+      }
+    });
+
+    function onSelectionChange() {
+      const checked = Array.from(
+        candidateListEl.querySelectorAll('input[type="checkbox"]:checked')
+      );
+      selected = checked.map((cb) => cb.value);
+      selectedCountEl.textContent = selected.length;
+
+      candidateListEl.querySelectorAll(".candidate-option").forEach((opt) => {
+        const cb = opt.querySelector('input[type="checkbox"]');
+        opt.classList.toggle("selected", cb.checked);
+        if (selected.length >= CONFIG.MAX_VOTES && !cb.checked) {
+          cb.disabled = true;
+          opt.classList.add("disabled");
+        } else {
+          cb.disabled = false;
+          opt.classList.remove("disabled");
+        }
+      });
+
+      voteBtn.disabled = selected.length === 0;
+    }
+
+    voteBtn.addEventListener("click", async () => {
+      hideMsg(msgBallot);
+      if (selected.length === 0) return;
+
+      setLoading(voteBtn, true, "Envoi...");
+      try {
+        await callBackend("vote", {
+          email: currentEmail,
+          candidates: selected,
+        });
+        stepBallot.hidden = true;
+        stepDone.hidden = false;
+      } catch (err) {
+        showMsg(msgBallot, err.message, "error");
+        setLoading(voteBtn, false);
+      }
+    });
+  </script>
 </body>
 </html>
