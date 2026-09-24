@@ -40,7 +40,7 @@
     <!-- Step 2: ballot -->
     <div class="card" id="step-ballot" hidden>
       <h2>Votre bulletin</h2>
-      <p class="card-desc">Sélectionnez jusqu'à 2 candidats.</p>
+      <p class="card-desc">Sélectionnez exactement 2 candidats.</p>
 
       <div id="msg-ballot" class="msg" hidden></div>
 
@@ -165,7 +165,7 @@
         }
       });
 
-      voteBtn.disabled = selected.length === 0;
+      voteBtn.disabled = selected.length !== CONFIG.MAX_VOTES;
     }
 
     voteBtn.addEventListener("click", async () => {

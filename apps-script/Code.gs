@@ -146,8 +146,8 @@ function handleVote_(body) {
       error: "Cette adresse e-mail n'est pas inscrite sur la liste de la classe.",
     });
   }
-  if (candidates.length === 0 || candidates.length > MAX_VOTES) {
-    return jsonOut_({ ok: false, error: `Sélectionnez entre 1 et ${MAX_VOTES} candidat(s).` });
+  if (candidates.length !== MAX_VOTES) {
+    return jsonOut_({ ok: false, error: `Vous devez sélectionner exactement ${MAX_VOTES} candidats.` });
   }
   if (new Set(candidates).size !== candidates.length) {
     return jsonOut_({ ok: false, error: "Un même candidat ne peut être sélectionné qu'une fois." });
