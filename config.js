@@ -6,7 +6,7 @@
 const CONFIG = {
   // Example: "https://script.google.com/macros/s/AKfycb.../exec"
   APPS_SCRIPT_URL:
-    "https://script.google.com/macros/s/AKfycbwILLO1s_DnQhLJtxPcedJPczSyyfmOI_M5kuthJOshDrGHzwhi5d-piJ_QV-BHRedS/exec",
+    "https://script.google.com/macros/s/AKfycbzFJGsR_OIj-tNdEficHrAR5fvzoxr1q-A-krRXAlo8ZPVEnmTMzmcx9zIuPOLZxO4/exec",
 
   // Name of the class / group, shown in the header and titles.
   ELECTION_NAME: "Élection du délégué de classe",

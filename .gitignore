@@ -3,6 +3,7 @@
 # never in git. This file is kept locally purely as your own reference
 # for updating that script later.
 voters.json
+apps-script/VOTERS.snippet.txt
 
 # OS junk
 .DS_Store
