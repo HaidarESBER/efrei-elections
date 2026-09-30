@@ -1,9 +1,8 @@
-# Real class roster (names + EFREI emails). Never push this — the live
-# voter list lives only in the deployed Google Apps Script (VOTERS array),
-# never in git. This file is kept locally purely as your own reference
-# for updating that script later.
+# Real class rosters (names + EFREI emails). Never push these — the live
+# rosters live only in "Voters - <Class>" tabs in your Google Sheet, never
+# in git. Kept locally purely as your own reference / paste source.
 voters.json
-apps-script/VOTERS.snippet.txt
+apps-script/*.snippet.txt
 
 # OS junk
 .DS_Store

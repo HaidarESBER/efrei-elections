@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-  <title>Élection du délégué — EFREI</title>
-  <meta name="description" content="Votez pour l'élection du délégué de classe EFREI." />
+  <title>Élections des délégués — EFREI</title>
+  <meta name="description" content="Votez pour l'élection du délégué de votre classe EFREI." />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -22,8 +22,9 @@
     <div class="card" id="step-email">
       <h2>Vérification</h2>
       <p class="card-desc">
-        Entrez votre e-mail EFREI pour accéder au bulletin de vote. Seuls
-        les étudiants inscrits sur la liste de la classe peuvent voter.
+        Entrez votre e-mail EFREI pour accéder au bulletin de vote de votre
+        classe. Seuls les étudiants inscrits sur une liste de classe
+        peuvent voter.
       </p>
 
       <div id="msg-email" class="msg" hidden></div>
@@ -39,7 +40,7 @@
 
     <!-- Step 2: ballot -->
     <div class="card" id="step-ballot" hidden>
-      <h2>Votre bulletin</h2>
+      <h2>Votre bulletin <span id="ballot-class" class="class-tag"></span></h2>
       <p class="card-desc">Sélectionnez exactement 2 candidats.</p>
 
       <div id="msg-ballot" class="msg" hidden></div>
@@ -62,12 +63,12 @@
     <!-- Step 3: confirmation -->
     <div class="card" id="step-done" hidden>
       <h2>Merci !</h2>
-      <p class="card-desc" style="margin-bottom:0;">Votre vote a bien été enregistré.</p>
+      <p class="card-desc" style="margin-bottom:0;" id="done-msg">Votre vote a bien été enregistré.</p>
     </div>
   </main>
 
   <footer class="site-footer">
-    Élection du délégué de classe · EFREI
+    Élections des délégués de classe · EFREI
   </footer>
 
   <script src="config.js"></script>
@@ -86,8 +87,10 @@
     const selectedCountEl = document.getElementById("selected-count");
     const voteBtn = document.getElementById("vote-btn");
     const candidaterLink = document.getElementById("candidater-link");
+    const ballotClassEl = document.getElementById("ballot-class");
 
     let currentEmail = "";
+    let currentClass = "";
     let selected = [];
 
     emailForm.addEventListener("submit", async (e) => {
@@ -102,17 +105,9 @@
 
       setLoading(checkBtn, true, "Vérification...");
       try {
-        const voters = await loadVoters();
-        if (!voters.has(email)) {
-          showMsg(
-            msgEmail,
-            "Cette adresse e-mail n'est pas inscrite sur la liste de la classe. Vous ne pouvez pas voter.",
-            "error"
-          );
-          return;
-        }
+        const cls = await identifyClass(email);
 
-        const res = await callBackend("candidates", {}, "GET");
+        const res = await callBackend("candidates", { class: cls }, "GET");
         const candidates = res.candidates || [];
 
         if (candidates.length === 0) {
@@ -138,6 +133,8 @@
         }
 
         currentEmail = email;
+        currentClass = cls;
+        ballotClassEl.textContent = cls;
         candidaterLink.href = `candidater.html?email=${encodeURIComponent(email)}`;
         stepEmail.hidden = true;
         stepBallot.hidden = false;
@@ -180,6 +177,8 @@
           email: currentEmail,
           candidates: selected,
         });
+        document.getElementById("done-msg").textContent =
+          `Votre vote pour la classe ${currentClass} a bien été enregistré.`;
         stepBallot.hidden = true;
         stepDone.hidden = false;
       } catch (err) {

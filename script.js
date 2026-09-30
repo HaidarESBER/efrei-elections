@@ -11,13 +11,15 @@ function isEfreiEmail(email) {
 }
 
 /**
- * Loads the voter list from the Apps Script backend (never bundled in the
- * site itself, so student emails never end up in a public git repo) and
- * returns a Set of lowercased emails.
+ * Asks the backend which class (if any) an e-mail belongs to. The full
+ * roster is never sent to the browser — only the answer for this one
+ * address — and it works across every class without the site needing to
+ * know class names in advance.
+ * Returns the class name (string) on success; throws on ineligible email.
  */
-async function loadVoters() {
-  const res = await callBackend("voters", {}, "GET");
-  return new Set((res.voters || []).map(normalizeEmail));
+async function identifyClass(email) {
+  const res = await callBackend("identify", { email }, "GET");
+  return res.class;
 }
 
 /**

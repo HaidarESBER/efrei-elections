@@ -1,27 +1,33 @@
 /**
- * EFREI délégué election — Google Apps Script backend.
+ * EFREI délégué election — Google Apps Script backend (multi-classe).
  *
  * Deploy this as a Web App (Deploy > New deployment > Web app,
  * execute as "Me", access "Anyone"). See ../SETUP.md for the
  * full walkthrough.
  *
+ * HOW CLASSES WORK
+ * -----------------
+ * Each class gets its own roster tab named "Voters - <Nom de la classe>",
+ * e.g. "Voters - M1 DEV1", "Voters - MDT TD1", "Voters - MDT TD2". Each
+ * tab is just a single column of e-mail addresses (one per row, header
+ * row optional).
+ *
+ * When someone enters their e-mail on the site, this script scans every
+ * "Voters - *" tab, finds which one contains that e-mail, and treats the
+ * part after "Voters - " as their class. That class then scopes which
+ * candidates they see and which vote/candidacy their submissions count
+ * toward.
+ *
+ * TO ADD A NEW CLASS: duplicate an existing "Voters - X" tab, rename it
+ * "Voters - <new class name>", replace the e-mail list. No code change,
+ * no redeployment needed — the script reads the roster live every time.
+ *
  * Sheets used (created automatically on first run if missing):
- *  - "Candidates": Timestamp | Email | Name
- *  - "Votes":      Timestamp | VoterEmail | Candidate1 | Candidate2
+ *  - "Candidates": Timestamp | Email | Name | Class
+ *  - "Votes":      Timestamp | VoterEmail | Candidate1 | Candidate2 | Class
  */
 
-// ---------------------------------------------------------------
-// CONFIG — the class's voter list lives ONLY here (never in the git repo
-// or in the static site), since this script is the sole source of truth
-// for both the eligibility check and the list handed to the browser via
-// the "voters" action below.
-// ---------------------------------------------------------------
-const VOTERS = [
-  "prenom.nom@efrei.net",
-  "jean.dupont@efrei.net",
-  "marie.martin@efrei.net",
-];
-
+const VOTERS_TAB_PREFIX = "Voters - ";
 const MAX_VOTES = 2;
 
 // ---------------------------------------------------------------
@@ -37,19 +43,15 @@ function getSheet_(name, headers) {
 }
 
 function candidatesSheet_() {
-  return getSheet_("Candidates", ["Timestamp", "Email", "Name"]);
+  return getSheet_("Candidates", ["Timestamp", "Email", "Name", "Class"]);
 }
 
 function votesSheet_() {
-  return getSheet_("Votes", ["Timestamp", "VoterEmail", "Candidate1", "Candidate2"]);
+  return getSheet_("Votes", ["Timestamp", "VoterEmail", "Candidate1", "Candidate2", "Class"]);
 }
 
 function normalize_(email) {
   return (email || "").toString().trim().toLowerCase();
-}
-
-function isEligible_(email) {
-  return VOTERS.map(normalize_).indexOf(normalize_(email)) !== -1;
 }
 
 function jsonOut_(obj) {
@@ -58,13 +60,46 @@ function jsonOut_(obj) {
   );
 }
 
-function getCandidates_() {
+/**
+ * Scans every "Voters - <Class>" tab and returns the class name that
+ * contains this e-mail, or null if it isn't on any roster.
+ */
+function getVoterClass_(email) {
+  const target = normalize_(email);
+  if (!target) return null;
+
+  const sheets = SpreadsheetApp.getActiveSpreadsheet().getSheets();
+  for (const sheet of sheets) {
+    const name = sheet.getName();
+    if (name.indexOf(VOTERS_TAB_PREFIX) !== 0) continue;
+
+    const className = name.substring(VOTERS_TAB_PREFIX.length).trim();
+    const values = sheet.getDataRange().getValues();
+    for (let i = 0; i < values.length; i++) {
+      const cell = normalize_(values[i][0]);
+      if (cell && cell !== "email" && cell === target) {
+        return className;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Candidates for a given class. Rows written before the multi-class
+ * migration have no Class value — those are treated as "M1 DEV1" so
+ * existing data keeps working without manual backfill.
+ */
+function getCandidates_(cls) {
   const sheet = candidatesSheet_();
   const rows = sheet.getDataRange().getValues();
   const candidates = [];
   for (let i = 1; i < rows.length; i++) {
-    const [, email, name] = rows[i];
-    if (email) candidates.push({ email: normalize_(email), name: name || email });
+    const [, email, name, rowClass] = rows[i];
+    const effectiveClass = (rowClass || "M1 DEV1").toString().trim();
+    if (email && effectiveClass === cls) {
+      candidates.push({ email: normalize_(email), name: name || email });
+    }
   }
   return candidates;
 }
@@ -72,11 +107,23 @@ function getCandidates_() {
 function doGet(e) {
   const action = e.parameter.action;
 
-  if (action === "candidates") {
-    return jsonOut_({ ok: true, candidates: getCandidates_() });
+  if (action === "identify") {
+    const cls = getVoterClass_(e.parameter.email);
+    if (!cls) {
+      return jsonOut_({
+        ok: false,
+        error: "Cette adresse e-mail n'est inscrite sur la liste d'aucune classe.",
+      });
+    }
+    return jsonOut_({ ok: true, class: cls });
   }
-  if (action === "voters") {
-    return jsonOut_({ ok: true, voters: VOTERS.map(normalize_) });
+
+  if (action === "candidates") {
+    const cls = (e.parameter.class || "").toString().trim();
+    if (!cls) {
+      return jsonOut_({ ok: false, error: "Classe manquante." });
+    }
+    return jsonOut_({ ok: true, candidates: getCandidates_(cls) });
   }
 
   return jsonOut_({ ok: false, error: "Action inconnue." });
@@ -114,21 +161,23 @@ function handleCandidate_(body) {
   if (!email || !name) {
     return jsonOut_({ ok: false, error: "Nom et e-mail requis." });
   }
-  if (!isEligible_(email)) {
+
+  const cls = getVoterClass_(email);
+  if (!cls) {
     return jsonOut_({
       ok: false,
-      error: "Cette adresse e-mail n'est pas inscrite sur la liste de la classe.",
+      error: "Cette adresse e-mail n'est inscrite sur la liste d'aucune classe.",
     });
   }
 
   const sheet = candidatesSheet_();
-  const existing = getCandidates_();
+  const existing = getCandidates_(cls);
   if (existing.some((c) => c.email === email)) {
     return jsonOut_({ ok: false, error: "Vous êtes déjà inscrit(e) comme candidat(e)." });
   }
 
-  sheet.appendRow([new Date(), email, name]);
-  return jsonOut_({ ok: true });
+  sheet.appendRow([new Date(), email, name, cls]);
+  return jsonOut_({ ok: true, class: cls });
 }
 
 function handleVote_(body) {
@@ -140,10 +189,12 @@ function handleVote_(body) {
   if (!email) {
     return jsonOut_({ ok: false, error: "E-mail requis." });
   }
-  if (!isEligible_(email)) {
+
+  const cls = getVoterClass_(email);
+  if (!cls) {
     return jsonOut_({
       ok: false,
-      error: "Cette adresse e-mail n'est pas inscrite sur la liste de la classe.",
+      error: "Cette adresse e-mail n'est inscrite sur la liste d'aucune classe.",
     });
   }
   if (candidates.length !== MAX_VOTES) {
@@ -153,7 +204,7 @@ function handleVote_(body) {
     return jsonOut_({ ok: false, error: "Un même candidat ne peut être sélectionné qu'une fois." });
   }
 
-  const validEmails = getCandidates_().map((c) => c.email);
+  const validEmails = getCandidates_(cls).map((c) => c.email);
   if (!candidates.every((c) => validEmails.indexOf(c) !== -1)) {
     return jsonOut_({ ok: false, error: "Candidat invalide." });
   }
@@ -167,6 +218,6 @@ function handleVote_(body) {
   }
 
   const [c1, c2] = candidates;
-  sheet.appendRow([new Date(), email, c1 || "", c2 || ""]);
-  return jsonOut_({ ok: true });
+  sheet.appendRow([new Date(), email, c1 || "", c2 || "", cls]);
+  return jsonOut_({ ok: true, class: cls });
 }
